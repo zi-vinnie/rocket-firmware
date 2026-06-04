@@ -1,0 +1,143 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --white-color: #dfdfdf;
+    --primary-color: #0b0c20;
+    --secondary-color: #8494c9;
+    --background-color: #45464d;
+    --red-color: #c39183;
+}
+
+body {
+    color: #dfdfdf;
+    background: var(--background-color);
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+h1 {
+    color: var(--primary-color);
+}
+
+#header {
+    height: 5em;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+#content {
+    min-width: 500px;
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#cards {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+}
+
+.card {
+    padding: 20px;
+    border-radius: 5px;
+    width: 100%;
+    height: 150px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    background: var(--primary-color);
+    font-family: Arial, sans-serif;
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
+}
+
+.value {
+    font-size: 50px;
+    font-weight: bold;
+    color: var(--secondary-color);
+    line-height: 0.8;
+}
+
+.value-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: flex-end;
+    gap: 0.2em;
+    width: 100%;
+    padding-block: 10px;
+    padding-inline: 5px;
+
+}
+
+.card-divider {
+    width: 100%;
+    height: 1px;
+    background: var(--white-color);
+}
+
+#card-1-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#card-2-container {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+}
+
+#toggle-recording-button-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: var(--primary-color);
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
+}
+
+#toggle-recording-button {
+    width: 100%;
+    height: 100%;
+    color: var(--primary-color);
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+#toggle-recording-button[data-recording="true"] {
+    background: var(--red-color);
+}
+#toggle-recording-button[data-recording="false"] {
+    background: var(--secondary-color);
+}
+#toggle-recording-button.disabled {
+    background: var(--background-color);
+    cursor: not-allowed;
+}
+

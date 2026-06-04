@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Space Exe</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div id="header">
+        <h1>Space Exe</h1>
+        <img src="favicon.ico" alt="Space Exe Rocket">
+    </div>
+    <div id="content">
+        <div id="card-1-container">
+            <div id="card-1" class="card">
+                <h3>Barometer</h3>
+                <hr class="card-divider">
+                <div class="value-container">
+                    <p id="barometer-value" class="value">1001.76</p>
+                    <p id="barometer-unit" class="unit">hPa</p>
+                </div>
+            </div>
+            <div id="card-2-container">
+                <div id="card-2" class="card">
+                    <h3>Temperature 1</h3>
+                    <hr class="card-divider">
+                    <div class="value-container">
+                        <p id="temp-1-value" class="value">21.8</p>
+                        <p id="temp-1-unit" class="unit">°C</p>
+                    </div>
+                </div>
+                <div id="card-3" class="card">
+                    <h3>Temperature 2</h3>
+                    <hr class="card-divider">
+                    <div class="value-container">
+                        <p id="temp-2-value" class="value">21.9</p>
+                        <p id="temp-2-unit" class="unit">°C</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="toggle-recording-button-container">
+            <button id="toggle-recording-button" data-recording="false" onmouseover="hoverRecordingButton(this, event)" onmouseout="hoverRecordingButton(this, event)">Start Recording</button>
+        </div>
+    </div>
+</body>
+<script>
+    const source = new EventSource('/events');
+
+    // Listen for specifically named events
+    source.addEventListener('sensor', (e) => {
+        const data = JSON.parse(e.data);
+        document.getElementById('barometer-value').textContent = data.pressure.toFixed(2);
+        document.getElementById('temp-1-value').textContent = data.temperature1.toFixed(2);
+        document.getElementById('temp-2-value').textContent = data.temperature2.toFixed(2);
+        console.log('Sensor data:', data);
+    });
+
+    function hoverRecordingButton(btn, event) {
+        if (btn.dataset.recording === 'true') {
+            if (event.type === 'mouseover') {
+                btn.textContent = 'Stop Recording';
+            } else {
+                btn.textContent = 'Recording...';
+            }
+        }
+    }
+
+    source.addEventListener('recording', (e) => {
+        if (e.data === 'true') {
+            const btn = document.getElementById('toggle-recording-button');
+            btn.dataset.recording = 'true';
+            btn.textContent = 'Recording...';
+        } else {
+            const btn = document.getElementById('toggle-recording-button');
+            btn.dataset.recording = 'false';
+            btn.textContent = 'Start Recording';
+        }
+        console.log('Recording:', e.data);
+    });
+
+    // Connection lifecycle
+    source.onopen = () => console.log('SSE connected');
+    source.onerror = () => console.log('SSE error — browser will retry automatically');
+
+    document.getElementById('toggle-recording-button').addEventListener('click', async () => {
+        const btn = document.getElementById('toggle-recording-button');
+        btn.disabled = true;  // prevent double-clicks while request is in flight
+
+        try {
+            const response = await fetch('/toggle-recording', { method: 'POST' });
+
+            if (!response.ok) {
+                console.error('Request failed:', response.status);
+                alert('Failed to toggle recording');
+            }
+        } catch (err) {
+            console.error('Network error:', err);
+            alert('Failed to toggle recording');
+        } finally {
+            btn.disabled = false;
+        }
+    });
+</script>
+</html>
