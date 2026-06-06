@@ -6,43 +6,46 @@
     <link rel="stylesheet" href="index.css">
 </head>
 <body>
-    <div id="header">
-        <h1>Space Exe</h1>
-        <img src="favicon.ico" alt="Space Exe Rocket">
-    </div>
-    <div id="content">
-        <div id="card-1-container">
-            <div id="card-1" class="card">
-                <h3>Barometer</h3>
+<div id="header">
+    <h1>Space Exe</h1>
+    <img src="favicon.ico" alt="Space Exe Rocket">
+</div>
+<div id="content">
+    <div id="card-1-container">
+        <div id="card-1" class="card">
+            <h3>Barometer</h3>
+            <hr class="card-divider">
+            <div class="value-container">
+                <p id="barometer-value" class="value">1001.76</p>
+                <p id="barometer-unit" class="unit">hPa</p>
+            </div>
+        </div>
+        <div id="card-2-container">
+            <div id="card-2" class="card">
+                <h3>Temperature 1</h3>
                 <hr class="card-divider">
                 <div class="value-container">
-                    <p id="barometer-value" class="value">1001.76</p>
-                    <p id="barometer-unit" class="unit">hPa</p>
+                    <p id="temp-1-value" class="value">21.8</p>
+                    <p id="temp-1-unit" class="unit">°C</p>
                 </div>
             </div>
-            <div id="card-2-container">
-                <div id="card-2" class="card">
-                    <h3>Temperature 1</h3>
-                    <hr class="card-divider">
-                    <div class="value-container">
-                        <p id="temp-1-value" class="value">21.8</p>
-                        <p id="temp-1-unit" class="unit">°C</p>
-                    </div>
-                </div>
-                <div id="card-3" class="card">
-                    <h3>Temperature 2</h3>
-                    <hr class="card-divider">
-                    <div class="value-container">
-                        <p id="temp-2-value" class="value">21.9</p>
-                        <p id="temp-2-unit" class="unit">°C</p>
-                    </div>
+            <div id="card-3" class="card">
+                <h3>Temperature 2</h3>
+                <hr class="card-divider">
+                <div class="value-container">
+                    <p id="temp-2-value" class="value">21.9</p>
+                    <p id="temp-2-unit" class="unit">°C</p>
                 </div>
             </div>
-        </div>
-        <div id="toggle-recording-button-container">
-            <button id="toggle-recording-button" data-recording="false" onmouseover="hoverRecordingButton(this, event)" onmouseout="hoverRecordingButton(this, event)">Start Recording</button>
         </div>
     </div>
+    <div class="button-container">
+        <button id="toggle-recording-button" data-recording="false">Start Recording</button>
+    </div>
+    <div class="button-container">
+        <button id="clear-data-button">Clear Data</button>
+    </div>
+</div>
 </body>
 <script>
     const source = new EventSource('/events');
@@ -56,25 +59,16 @@
         console.log('Sensor data:', data);
     });
 
-    function hoverRecordingButton(btn, event) {
-        if (btn.dataset.recording === 'true') {
-            if (event.type === 'mouseover') {
-                btn.textContent = 'Stop Recording';
-            } else {
-                btn.textContent = 'Recording...';
-            }
-        }
-    }
-
     source.addEventListener('recording', (e) => {
+        const clearDataButton = document.getElementById('clear-data-button');
+        const toggleRecordingButton = document.getElementById('toggle-recording-button');
+        clearDataButton.disabled = e.data === 'true';
         if (e.data === 'true') {
-            const btn = document.getElementById('toggle-recording-button');
-            btn.dataset.recording = 'true';
-            btn.textContent = 'Recording...';
+            toggleRecordingButton.dataset.recording = 'true';
+            toggleRecordingButton.textContent = 'Stop Recording';
         } else {
-            const btn = document.getElementById('toggle-recording-button');
-            btn.dataset.recording = 'false';
-            btn.textContent = 'Start Recording';
+            toggleRecordingButton.dataset.recording = 'false';
+            toggleRecordingButton.textContent = 'Start Recording';
         }
         console.log('Recording:', e.data);
     });
@@ -88,7 +82,7 @@
         btn.disabled = true;  // prevent double-clicks while request is in flight
 
         try {
-            const response = await fetch('/toggle-recording', { method: 'POST' });
+            const response = await fetch('/toggle-recording', {method: 'POST'});
 
             if (!response.ok) {
                 console.error('Request failed:', response.status);
@@ -99,6 +93,30 @@
             alert('Failed to toggle recording');
         } finally {
             btn.disabled = false;
+        }
+    });
+
+    document.getElementById('clear-data-button').addEventListener('click', async () => {
+        const btn = document.getElementById('clear-data-button');
+        const clearDataConfirmation = confirm('Are you sure you want to clear data?');
+        if (!clearDataConfirmation) {
+            return;
+        }
+        
+        btn.disabled = true;
+        try {
+            const response = await fetch('/clear-data', {method: 'POST'});
+            if (!response.ok) {
+                console.error('Request failed:', response.status);
+                alert('Failed to clear data');
+            } else {
+                alert('Cleared data.')
+            }
+        } catch (err) {
+            console.error('Network error:', err);
+            alert('Failed to clear data');
+        } finally {
+            btn.disabled = document.getElementById('toggle-recording-button').dataset.recording === 'true';
         }
     });
 </script>
