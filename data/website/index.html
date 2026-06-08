@@ -45,24 +45,29 @@
     <div class="button-container">
         <button id="clear-data-button">Clear Data</button>
     </div>
+    <div class="button-container">
+        <button id="download-data-button">Download Data</button>
+    </div>
 </div>
 </body>
 <script>
     const source = new EventSource('/events');
 
-    // Listen for specifically named events
     source.addEventListener('sensor', (e) => {
+        const sensorPrecision = 2;
         const data = JSON.parse(e.data);
-        document.getElementById('barometer-value').textContent = data.pressure.toFixed(2);
-        document.getElementById('temp-1-value').textContent = data.temperature1.toFixed(2);
-        document.getElementById('temp-2-value').textContent = data.temperature2.toFixed(2);
+        document.getElementById('barometer-value').textContent = data.pressure.toFixed(sensorPrecision);
+        document.getElementById('temp-1-value').textContent = data.temperature1.toFixed(sensorPrecision);
+        document.getElementById('temp-2-value').textContent = data.temperature2.toFixed(sensorPrecision);
         console.log('Sensor data:', data);
     });
 
     source.addEventListener('recording', (e) => {
         const clearDataButton = document.getElementById('clear-data-button');
         const toggleRecordingButton = document.getElementById('toggle-recording-button');
+        const downloadDataButton = document.getElementById('download-data-button');
         clearDataButton.disabled = e.data === 'true';
+        downloadDataButton.disabled = e.data === 'true';
         if (e.data === 'true') {
             toggleRecordingButton.dataset.recording = 'true';
             toggleRecordingButton.textContent = 'Stop Recording';
@@ -102,22 +107,29 @@
         if (!clearDataConfirmation) {
             return;
         }
-        
+
         btn.disabled = true;
         try {
             const response = await fetch('/clear-data', {method: 'POST'});
             if (!response.ok) {
                 console.error('Request failed:', response.status);
                 alert('Failed to clear data');
-            } else {
-                alert('Cleared data.')
             }
         } catch (err) {
             console.error('Network error:', err);
             alert('Failed to clear data');
         } finally {
+            // Restore correct state: stay disabled if recording started while the request was in flight
             btn.disabled = document.getElementById('toggle-recording-button').dataset.recording === 'true';
         }
+    });
+
+    document.getElementById('download-data-button').addEventListener('click', () => {
+        const downloadDataButton = document.getElementById('download-data-button');
+
+        downloadDataButton.disabled = true;
+        window.open('/download', '_blank');
+        downloadDataButton.disabled = document.getElementById('toggle-recording-button').dataset.recording === 'true';
     });
 </script>
 </html>

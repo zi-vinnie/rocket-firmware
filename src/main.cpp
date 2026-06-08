@@ -15,6 +15,7 @@ namespace {
     constexpr unsigned long kSensorIntervalMs = 100;
     constexpr unsigned long kFlushIntervalMs = 1000;
     constexpr float kMockPressureHpa = 1001.76f;
+    constexpr int kSensorPrecision = 2;
 
     struct SensorReading {
         float pressure;
@@ -43,8 +44,10 @@ namespace {
     void sendSensorEvent(const SensorReading &reading) {
         char json[128];
         snprintf(json, sizeof(json),
-                 R"({"pressure":%.2f,"temperature1":%.2f,"temperature2":%.2f})",
-                 reading.pressure, reading.temperature1, reading.temperature2);
+                 R"({"pressure":%.*f,"temperature1":%.*f,"temperature2":%.*f})",
+                 kSensorPrecision, reading.pressure,
+                 kSensorPrecision, reading.temperature1,
+                 kSensorPrecision, reading.temperature2);
         events.send(json, "sensor", millis());
     }
 
@@ -69,15 +72,19 @@ namespace {
         if (LittleFS.exists(kSensorDataPath)) {
             return;
         }
-        File file = LittleFS.open(kSensorDataPath, FILE_READ, true);
+        File file = LittleFS.open(kSensorDataPath, FILE_WRITE, true);
+        file.printf("timestamp,pressure,temperature1,temperature2\n");
         if (file) {
             file.close();
         }
     }
 
     void logSensorSample(const unsigned long timestamp, const SensorReading &reading) {
-        sensorData.printf("%lu,%f,%f,%f\n",
-                          timestamp, reading.pressure, reading.temperature1, reading.temperature2);
+        sensorData.printf("%lu,%.*f,%.*f,%.*f\n",
+                          timestamp,
+                          kSensorPrecision, reading.pressure,
+                          kSensorPrecision, reading.temperature1,
+                          kSensorPrecision, reading.temperature2);
 
         if (timestamp - lastFlush >= kFlushIntervalMs) {
             sensorData.flush();
@@ -107,6 +114,20 @@ namespace {
             clearDataPending.store(true);
             request->send(200);
         });
+
+        server.on("/download", HTTP_GET, [](AsyncWebServerRequest *request) {
+            if (recording.load()) {
+                request->send(409, "text/plain", "Cannot download data while recording");
+                return;
+            }
+
+            if (!LittleFS.exists(kSensorDataPath)) {
+                request->send(404, "text/plain", "File not found");
+                return;
+            }
+
+            request->send(LittleFS, kSensorDataPath, "text/csv", true);
+        });
     }
 } // namespace
 
@@ -114,9 +135,6 @@ void setup() {
     Serial.begin(115200);
     if (!LittleFS.begin()) {
         Serial.println("LittleFS mount failed");
-    }
-    if (!LittleFS.exists("/data")) {
-        LittleFS.mkdir("/data");
     }
     ensureSensorDataFileExists();
     WiFi.softAP(kApSsid, kApPassword);
@@ -138,7 +156,7 @@ void setup() {
     });
     bmpReady = bmp.begin();
     if (!bmpReady) {
-        Serial.println("BMP085 init failed");
+        Serial.println("Barometer init failed");
     }
     server.addHandler(&events);
     server.begin();

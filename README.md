@@ -1,46 +1,40 @@
 # Space Exe Rocket Firmware
 
-Firmware for the Space Exe rocket, running on an **Arduino Nano ESP32**. It hosts a Wi-Fi AP and a web dashboard for live sensor data.
+Software for the Space Exe rocket, running on an **Arduino Nano ESP32**. The rocket creates its own Wi‑Fi network and shows a web page you can open on a phone or laptop to view live readings and manage flight data.
 
-## Implemented
+## What's working
 
-### Wi‑Fi access point + web server
+### Wi‑Fi network and web page
 
-The ESP32 runs as a soft AP (`Space-Exe-Rocket`) and serves a dashboard from **LittleFS** using [ESPAsyncWebServer](https://github.com/esp32async/ESPAsyncWebServer). Static assets live in `data/website/` and are uploaded to the filesystem partition.
-
-### Live sensor dashboard
+The rocket broadcasts a Wi‑Fi network called **Space-Exe-Rocket**. Once connected, open **http://192.168.4.1** in a browser to see the dashboard with live sensor readings.
 
 ![Web dashboard](images/web_dashboard.png)
 
-The dashboard displays:
+The dashboard shows:
 
-- Barometer (hPa)
-- Temperature 1 and 2 (°C), read from analog pins `A0` and `A1`
+- **Air pressure** from the barometer (in hPa)
+- **Two temperature readings** (in °C) — the display is in place, but the temperature sensors have **not been programmed yet**
 
-The values update in real time from a SSE connection. Currently none of these values work but they are a **proof of concept**.
+### Recording flight data
 
-### Recording toggle
+You can start and stop recording from the dashboard. While recording, sensor readings are sampled every **100 ms** and appended to a CSV file.
 
-A **Start / Stop Recording** button on the dashboard POSTs to `/toggle-recording`. The firmware flips a recording flag and broadcasts the new state over SSE so the button label stays correct.
+The file has a header row with columns `timestamp`, `pressure`, `temperature1`, and `temperature2`. Each data row includes the millisecond timestamp from boot and the current sensor values (2 decimal places). The file is flushed to flash every second so that if power is lost mid-flight, data written up to that point should remain intact.
 
-### LittleFS
+You can **download** the CSV from the dashboard or **clear** it to start fresh.
 
-The web UI is stored on LittleFS rather than embedded in flash. Flight data will also be logged to LittleFS — this matters because LittleFS is designed for embedded flash: if power is lost mid-flight, data written up to that point should remain intact.
+## Still to do
 
-## Planned
+**Sensors**
 
-**Foundations**
+- **Temperature sensors** — wire up and read the two temperature sensors properly
 
-- **Implement real sensor data** — read the actual sensor data from the hardware
-- **Flight data logging** — log flight data to LittleFS, including pressure, temperature, and altitude
+**Before launch**
 
-**Pre-launch**
+- **Turn Wi‑Fi off from the dashboard** — disable the network during flight to save battery and reduce radio interference
 
-- **Wi‑Fi off from dashboard** — disable the AP during flight to save power and reduce RF interference
+**After landing**
 
-**Post-landing recovery**
-
-- **RGB apogee indicator** — flash the onboard RGB LED to encode the apogee digits (e.g. digit count via flashes, then each digit)
-- **Auto Wi‑Fi on after landing** — automatically re-enable the AP once the rocket has landed
-- **Apogee on dashboard** — compute and display peak altitude in the UI
-- **Download flight data** — endpoint and dashboard control to download logged data to a laptop
+- **RGB light apogee indicator** — flash the onboard colour LED to show peak altitude (e.g. number of flashes for digit count, then one flash per digit)
+- **Turn Wi‑Fi back on automatically** — re-enable the network once the rocket has landed
+- **Peak altitude on the dashboard** — calculate and show how high the rocket went
