@@ -2,10 +2,8 @@
 #include <WiFi.h>
 #include <LittleFS.h>
 #include <ESPAsyncWebServer.h>
-
 #include <atomic>
-#include <cstdio>
-
+#include <ArduinoJson.h>
 #include "Adafruit_BMP085.h"
 
 namespace {
@@ -19,12 +17,15 @@ namespace {
 
     struct SensorReading {
         float pressure;
+        float altitude;
         float temperature1;
         float temperature2;
     };
 
     std::atomic<bool> recording{false};
     std::atomic<bool> clearDataPending{false};
+    std::atomic<bool> calibratePending{false};
+    std::atomic<float> calibratedPressure{0.0f};
     bool bmpReady = false;
     unsigned long lastFlush = 0;
 
@@ -42,20 +43,49 @@ namespace {
     }
 
     void sendSensorEvent(const SensorReading &reading) {
-        char json[128];
-        snprintf(json, sizeof(json),
-                 R"({"pressure":%.*f,"temperature1":%.*f,"temperature2":%.*f})",
-                 kSensorPrecision, reading.pressure,
-                 kSensorPrecision, reading.temperature1,
-                 kSensorPrecision, reading.temperature2);
+        JsonDocument doc;
+        doc["pressure"] = reading.pressure;
+        doc["altitude"] = reading.altitude;
+        doc["temperature1"] = reading.temperature1;
+        doc["temperature2"] = reading.temperature2;
+        String json;
+        serializeJson(doc, json);
         events.send(json, "sensor", millis());
     }
 
+    void sendCalibrationEvent() {
+        JsonDocument doc;
+        doc["calibratedPressure"] = calibratedPressure.load() / 100.0f;
+        String json;
+        serializeJson(doc, json);
+        events.send(json, "calibration", millis());
+    }
+
+    float pressureToAltitude(const float pressurePa, const float sealevelPressurePa) {
+        if (sealevelPressurePa <= 0.0f) {
+            return 0.0f;
+        }
+        return 44330 * (1.0f - pow(pressurePa / sealevelPressurePa, 0.1903));
+    }
+
     SensorReading readSensors() {
+        if (!bmpReady) {
+            return {
+                .pressure = kMockPressureHpa,
+                .altitude = 0.0f,
+                .temperature1 = 0.0f,
+                .temperature2 = static_cast<float>(analogRead(A1)) / 100.0f,
+            };
+        }
+
+        const float pressurePa = bmp.readPressure();
+        const float sealevelPressurePa = calibratedPressure.load();
+
         return {
-            bmpReady ? bmp.readPressure() / 100.0f : kMockPressureHpa,
-            static_cast<float>(analogRead(A0)) / 100.0f,
-            static_cast<float>(analogRead(A1)) / 100.0f,
+            .pressure = pressurePa / 100.0f,
+            .altitude = pressureToAltitude(pressurePa, sealevelPressurePa),
+            .temperature1 = bmp.readTemperature(),
+            .temperature2 = static_cast<float>(analogRead(A1)) / 100.0f,
         };
     }
 
@@ -73,16 +103,42 @@ namespace {
             return;
         }
         File file = LittleFS.open(kSensorDataPath, FILE_WRITE, true);
-        file.printf("timestamp,pressure,temperature1,temperature2\n");
+        file.printf("timestamp,pressure,altitude,temperature1,temperature2\n");
         if (file) {
             file.close();
         }
     }
 
+    void runPendingClearData() {
+        if (!clearDataPending.exchange(false)) {
+            return;
+        }
+
+        closeSensorLog();
+        if (LittleFS.exists(kSensorDataPath)) {
+            LittleFS.remove(kSensorDataPath);
+        }
+        ensureSensorDataFileExists();
+    }
+
+    void runPendingCalibration() {
+        if (!calibratePending.exchange(false)) {
+            return;
+        }
+        if (!bmpReady) {
+            return;
+        }
+
+        calibratedPressure.store(bmp.readPressure());
+        Serial.printf("Calibrated pressure: %f\n", calibratedPressure.load() / 100.0f);
+        sendCalibrationEvent();
+    }
+
     void logSensorSample(const unsigned long timestamp, const SensorReading &reading) {
-        sensorData.printf("%lu,%.*f,%.*f,%.*f\n",
+        sensorData.printf("%lu,%.*f,%.*f,%.*f,%.*f\n",
                           timestamp,
                           kSensorPrecision, reading.pressure,
+                          kSensorPrecision, reading.altitude,
                           kSensorPrecision, reading.temperature1,
                           kSensorPrecision, reading.temperature2);
 
@@ -128,6 +184,20 @@ namespace {
 
             request->send(LittleFS, kSensorDataPath, "text/csv", true);
         });
+
+        server.on("/calibrate-altitude", HTTP_POST, [](AsyncWebServerRequest *request) {
+            if (recording.load()) {
+                request->send(409, "text/plain", "Cannot calibrate while recording");
+                return;
+            }
+            if (!bmpReady) {
+                request->send(503, "text/plain", "Barometer not ready");
+                return;
+            }
+
+            calibratePending.store(true);
+            request->send(200);
+        });
     }
 } // namespace
 
@@ -138,7 +208,6 @@ void setup() {
     }
     ensureSensorDataFileExists();
     WiFi.softAP(kApSsid, kApPassword);
-    pinMode(A0, INPUT);
     pinMode(A1, INPUT);
 
     if (!LittleFS.begin()) {
@@ -157,6 +226,8 @@ void setup() {
     bmpReady = bmp.begin();
     if (!bmpReady) {
         Serial.println("Barometer init failed");
+    } else {
+        calibratedPressure.store(bmp.readPressure());
     }
     server.addHandler(&events);
     server.begin();
@@ -167,15 +238,11 @@ void loop() {
 
     const unsigned long now = millis();
 
-    if (clearDataPending.exchange(false)) {
-        closeSensorLog();
-        if (LittleFS.exists(kSensorDataPath)) {
-            LittleFS.remove(kSensorDataPath);
-        }
-        ensureSensorDataFileExists();
-    } else if (!recording.load() && sensorData) {
+    runPendingClearData();
+    if (!recording.load() && sensorData) {
         closeSensorLog();
     }
+    runPendingCalibration();
 
     if (now - lastSampleMs < kSensorIntervalMs) {
         return;

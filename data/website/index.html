@@ -19,6 +19,21 @@
                 <p id="barometer-value" class="value">1001.76</p>
                 <p id="barometer-unit" class="unit">hPa</p>
             </div>
+            <hr class="card-divider">
+            <div class="section-header">
+                <div></div>
+                <h3>Altitude</h3>
+                <button class="hidden-button" id="calibrate-altitude-button">
+                    <div class="hidden-button-value-container">
+                        <p style="line-height: 1.09;" id="calibrated-altitude-value">1001.76</p>
+                        <p class="hidden-button-unit">hPa</p>
+                    </div>
+                </button>
+            </div>
+            <div class="value-container">
+                <p id="altitude-value" class="value">0.0</p>
+                <p id="altitude-unit" class="unit">m</p>
+            </div>
         </div>
         <div id="card-2-container">
             <div id="card-2" class="card">
@@ -39,35 +54,43 @@
             </div>
         </div>
     </div>
-    <div class="button-container">
-        <button id="toggle-recording-button" data-recording="false">Start Recording</button>
-    </div>
-    <div class="button-container">
-        <button id="clear-data-button">Clear Data</button>
-    </div>
-    <div class="button-container">
-        <button id="download-data-button">Download Data</button>
+    <div class="card">
+        <button class="main-button" id="toggle-recording-button" data-recording="false">Start Recording</button>
+        <button class="main-button" id="clear-data-button">Clear Data</button>
+        <button class="main-button" id="download-data-button">Download Data</button>
     </div>
 </div>
 </body>
 <script>
     const source = new EventSource('/events');
+    const sensorPrecision = 2;
+
+    const formatSensorValue = (value) => Number(value ?? 0).toFixed(sensorPrecision);
 
     source.addEventListener('sensor', (e) => {
-        const sensorPrecision = 2;
+    
         const data = JSON.parse(e.data);
-        document.getElementById('barometer-value').textContent = data.pressure.toFixed(sensorPrecision);
-        document.getElementById('temp-1-value').textContent = data.temperature1.toFixed(sensorPrecision);
-        document.getElementById('temp-2-value').textContent = data.temperature2.toFixed(sensorPrecision);
+        document.getElementById('barometer-value').textContent = formatSensorValue(data.pressure);
+        document.getElementById('altitude-value').textContent = formatSensorValue(data.altitude);
+        document.getElementById('temp-1-value').textContent = formatSensorValue(data.temperature1);
+        document.getElementById('temp-2-value').textContent = formatSensorValue(data.temperature2);
         console.log('Sensor data:', data);
+    });
+
+    source.addEventListener('calibration', (e) => {
+        const data = JSON.parse(e.data);
+        document.getElementById('calibrated-altitude-value').textContent = formatSensorValue(data.calibratedPressure);
+        console.log('Calibration:', data);
     });
 
     source.addEventListener('recording', (e) => {
         const clearDataButton = document.getElementById('clear-data-button');
         const toggleRecordingButton = document.getElementById('toggle-recording-button');
         const downloadDataButton = document.getElementById('download-data-button');
+        const calibrateAltitudeButton = document.getElementById('calibrate-altitude-button');
         clearDataButton.disabled = e.data === 'true';
         downloadDataButton.disabled = e.data === 'true';
+        calibrateAltitudeButton.disabled = e.data === 'true';
         if (e.data === 'true') {
             toggleRecordingButton.dataset.recording = 'true';
             toggleRecordingButton.textContent = 'Stop Recording';
@@ -130,6 +153,23 @@
         downloadDataButton.disabled = true;
         window.open('/download', '_blank');
         downloadDataButton.disabled = document.getElementById('toggle-recording-button').dataset.recording === 'true';
+    });
+
+    document.getElementById('calibrate-altitude-button').addEventListener('click', async () => {
+        const btn = document.getElementById('calibrate-altitude-button');
+        btn.disabled = true;
+        try {
+            const response = await fetch('/calibrate-altitude', {method: 'POST'});
+            if (!response.ok) {
+                console.error('Request failed:', response.status);
+                alert('Failed to calibrate altitude');
+            }
+        } catch (err) {
+            console.error('Network error:', err);
+            alert('Failed to calibrate altitude');
+        } finally {
+            btn.disabled = document.getElementById('toggle-recording-button').dataset.recording === 'true';
+        }
     });
 </script>
 </html>

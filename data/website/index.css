@@ -7,6 +7,7 @@
 :root {
     --white-color: #dfdfdf;
     --primary-color: #0b0c20;
+    --light-primary-color: #232545;
     --secondary-color: #8494c9;
     --background-color: #45464d;
     --red-color: #c39183;
@@ -22,16 +23,13 @@ body {
     align-items: center;
 }
 
-h1 {
-    color: var(--primary-color);
-}
-
 #header {
-    height: 5em;
+    margin-top: 20px;
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 10px;
+    color: var(--white-color);
 }
 
 #content {
@@ -54,7 +52,6 @@ h1 {
     padding: 20px;
     border-radius: 5px;
     width: 100%;
-    height: 150px;
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -93,6 +90,18 @@ h1 {
     background: var(--white-color);
 }
 
+/* Only used for the altitude section so we can align the button to the right */
+.section-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    width: 100%;
+    align-items: center;
+}
+
+.hidden-button {
+    justify-self: flex-end;
+}
+
 #card-1-container {
     width: 100%;
     display: flex;
@@ -107,21 +116,8 @@ h1 {
     gap: 10px;
 }
 
-.button-container {
+button.main-button {
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    background: var(--primary-color);
-    padding: 10px;
-    border-radius: 5px;
-    box-shadow: 0 0 10px 0 rgba(0, 0, 0, 0.5);
-}
-
-button {
-    width: 100%;
-    height: 100%;
     color: var(--primary-color);
     border: none;
     padding: 10px;
@@ -131,24 +127,67 @@ button {
     transition: background 0.3s ease;
 }
 
-:where(#toggle-recording-button[data-recording="true"]) {
-    background: var(--red-color);
+/* Default button style */
+/* Using where to allow button:disabled to override */
+:where(button.main-button) {
+    background: var(--secondary-color);
 }
 
-:where(#toggle-recording-button[data-recording="false"]) {
-    background: var(--secondary-color);
+:where(#toggle-recording-button[data-recording="true"]) {
+    background: var(--red-color);
 }
 
 :where(#clear-data-button) {
     background: var(--red-color);
 }
 
-:where(#download-data-button) {
-    background: var(--secondary-color);
-}
-
-button:disabled {
+button:disabled.main-button {
     background: var(--background-color);
     cursor: not-allowed;
 }
 
+button:disabled.hidden-button {
+    background: var(--background-color);
+    color: var(--primary-color);
+    cursor: not-allowed;
+}
+
+.input-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+button.hidden-button {
+    cursor: pointer;
+    border: none;
+    border-radius: 5px;
+    height: 100%;
+    width: 80px;
+    color: var(--secondary-color);
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 0.2em;
+    transition: background 0.3s ease;
+}
+
+:where(button.hidden-button) {
+    background: var(--light-primary-color);
+}
+
+button.hidden-button .hidden-button-value-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 0.2em;
+}
+
+button.hidden-button .hidden-button-unit {
+    font-size: 10px;
+}
