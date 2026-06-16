@@ -96,11 +96,13 @@ namespace {
 
     void closeSensorLog() {
         if (sensorFile) {
+            Serial.println("Closing sensor data file");
             sensorFile.flush();
             sensorFile.close();
             sensorFile = File();
         }
         if (apogeeFile) {
+            Serial.println("Closing apogee file");
             apogeeFile.flush();
             apogeeFile.close();
             apogeeFile = File();
@@ -137,7 +139,7 @@ namespace {
         if (!clearDataPending.exchange(false)) {
             return;
         }
-
+        Serial.println("Clearing data");
         closeSensorLog();
         if (LittleFS.exists(kSensorDataPath)) {
             LittleFS.remove(kSensorDataPath);
@@ -154,10 +156,11 @@ namespace {
         if (!calibratePending.exchange(false)) {
             return;
         }
+        Serial.println("Calibrating altitude");
         if (!bmpReady) {
+            Serial.println("Could not calibrate altitude, barometer not ready");
             return;
         }
-
         calibratedPressure.store(bmp.readPressure());
         Serial.printf("Calibrated pressure: %f\n", calibratedPressure.load() / 100.0f);
         sendCalibrationEvent();
@@ -191,13 +194,16 @@ namespace {
         });
 
         server.on("/toggle-recording", HTTP_POST, [](AsyncWebServerRequest *request) {
-            recording.store(!recording.load());
+            const bool nowRecording = !recording.load();
+            recording.store(nowRecording);
+            Serial.println(nowRecording ? "Recording started" : "Recording stopped");
             sendRecordingEvent();
             request->send(200);
         });
 
         server.on("/clear-data", HTTP_POST, [](AsyncWebServerRequest *request) {
             if (recording.load()) {
+                Serial.println("Rejected clear-data: recording in progress");
                 request->send(409, "text/plain", "Cannot clear while recording");
                 return;
             }
@@ -208,11 +214,13 @@ namespace {
 
         server.on("/download-sensor-data", HTTP_GET, [](AsyncWebServerRequest *request) {
             if (recording.load()) {
+                Serial.println("Rejected download-sensor-data: recording in progress");
                 request->send(409, "text/plain", "Cannot download sensor data while recording");
                 return;
             }
 
             if (!LittleFS.exists(kSensorDataPath)) {
+                Serial.println("Rejected download-sensor-data: file not found");
                 request->send(404, "text/plain", "File not found");
                 return;
             }
@@ -222,11 +230,13 @@ namespace {
 
         server.on("/download-apogee", HTTP_GET, [](AsyncWebServerRequest *request) {
             if (recording.load()) {
+                Serial.println("Rejected download-apogee: recording in progress");
                 request->send(409, "text/plain", "Cannot download apogee while recording");
                 return;
             }
 
             if (!LittleFS.exists(kApogeePath)) {
+                Serial.println("Rejected download-apogee: file not found");
                 request->send(404, "text/plain", "File not found");
                 return;
             }
@@ -236,10 +246,12 @@ namespace {
 
         server.on("/calibrate-altitude", HTTP_POST, [](AsyncWebServerRequest *request) {
             if (recording.load()) {
+                Serial.println("Rejected calibrate-altitude: recording in progress");
                 request->send(409, "text/plain", "Cannot calibrate while recording");
                 return;
             }
             if (!bmpReady) {
+                Serial.println("Rejected calibrate-altitude: barometer not ready");
                 request->send(503, "text/plain", "Barometer not ready");
                 return;
             }
@@ -251,8 +263,10 @@ namespace {
         events.onConnect([](AsyncEventSourceClient *client) {
             if (client->lastId()) {
                 Serial.printf("Client reconnecting, last event id: %u\n", client->lastId());
+            } else {
+                Serial.println("SSE client connected");
             }
-    
+
             client->send(recordingStateText(), "recording", millis(), 10000);
         });
 
@@ -280,12 +294,13 @@ void setup() {
 
     WiFiClass::mode(WIFI_AP);
     WiFi.softAP(kApSsid, kApPassword);
+    Serial.printf("WiFi AP started: %s at %s\n", kApSsid, WiFi.softAPIP().toString().c_str());
 
     setupServer();
 
     bmpReady = bmp.begin();
     if (!bmpReady) {
-        Serial.println("Barometer init failed");
+        Serial.println("Barometer init failed, using mock sensor data");
     } else {
         calibratedPressure.store(bmp.readPressure());
     }
@@ -299,7 +314,7 @@ void loop() {
 
     runPendingClearData();
     runPendingCalibration();
-    if (!recording.load() && (sensorFile || apogeeFile)) {
+    if (!recording.load()) {
         closeSensorLog();
     }
 
@@ -317,11 +332,11 @@ void loop() {
     if (recording.load()) {
         if (!sensorFile || !apogeeFile) {
             if (!sensorFile) {
-                Serial.println("Opening sensor file for writing");
+                Serial.println("Opening sensor file for writing since recording started");
                 sensorFile = LittleFS.open(kSensorDataPath, FILE_APPEND);
             }
             if (!apogeeFile) {
-                Serial.println("Opening apogee file for writing");
+                Serial.println("Opening apogee file for writing since recording started");
                 apogeeFile = LittleFS.open(kApogeePath, FILE_APPEND);
             }
             if (!sensorFile || !apogeeFile) {
