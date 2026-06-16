@@ -12,6 +12,14 @@
 </div>
 <div id="content">
     <div id="card-1-container">
+        <div id="card-3" class="card">
+            <h3>Apogee</h3>
+            <hr class="card-divider">
+            <div class="value-container">
+                <p id="apogee-value" class="value">0.0</p>
+                <p id="apogee-unit" class="unit">m</p>
+            </div>
+        </div>
         <div id="card-1" class="card">
             <h3>Barometer</h3>
             <hr class="card-divider">
@@ -19,7 +27,6 @@
                 <p id="barometer-value" class="value">1001.76</p>
                 <p id="barometer-unit" class="unit">hPa</p>
             </div>
-            <hr class="card-divider">
             <div class="section-header">
                 <div></div>
                 <h3>Altitude</h3>
@@ -30,6 +37,7 @@
                     </div>
                 </button>
             </div>
+            <hr class="card-divider">
             <div class="value-container">
                 <p id="altitude-value" class="value">0.0</p>
                 <p id="altitude-unit" class="unit">m</p>
@@ -56,8 +64,11 @@
     </div>
     <div class="card">
         <button class="main-button" id="toggle-recording-button" data-recording="false">Start Recording</button>
+        <div style="display: flex; flex-direction: row; gap: 10px; width: 100%;">
+            <button class="main-button" id="download-data-button">Download Sensor Data</button>
+            <button class="main-button" id="download-apogee-button">Download Apogee Data</button>
+        </div>
         <button class="main-button" id="clear-data-button">Clear Data</button>
-        <button class="main-button" id="download-data-button">Download Data</button>
     </div>
 </div>
 </body>
@@ -74,6 +85,7 @@
         document.getElementById('altitude-value').textContent = formatSensorValue(data.altitude);
         document.getElementById('temp-1-value').textContent = formatSensorValue(data.temperature1);
         document.getElementById('temp-2-value').textContent = formatSensorValue(data.temperature2);
+        document.getElementById('apogee-value').textContent = formatSensorValue(data.apogee);
         console.log('Sensor data:', data);
     });
 
@@ -87,9 +99,11 @@
         const clearDataButton = document.getElementById('clear-data-button');
         const toggleRecordingButton = document.getElementById('toggle-recording-button');
         const downloadDataButton = document.getElementById('download-data-button');
+        const downloadApogeeButton = document.getElementById('download-apogee-button');
         const calibrateAltitudeButton = document.getElementById('calibrate-altitude-button');
         clearDataButton.disabled = e.data === 'true';
         downloadDataButton.disabled = e.data === 'true';
+        downloadApogeeButton.disabled = e.data === 'true';
         calibrateAltitudeButton.disabled = e.data === 'true';
         if (e.data === 'true') {
             toggleRecordingButton.dataset.recording = 'true';
@@ -151,8 +165,15 @@
         const downloadDataButton = document.getElementById('download-data-button');
 
         downloadDataButton.disabled = true;
-        window.open('/download', '_blank');
+        window.open('/download-sensor-data', '_blank');
         downloadDataButton.disabled = document.getElementById('toggle-recording-button').dataset.recording === 'true';
+    });
+
+    document.getElementById('download-apogee-button').addEventListener('click', () => {
+        const downloadApogeeButton = document.getElementById('download-apogee-button');
+        downloadApogeeButton.disabled = true;
+        window.open('/download-apogee', '_blank');
+        downloadApogeeButton.disabled = document.getElementById('toggle-recording-button').dataset.recording === 'true';
     });
 
     document.getElementById('calibrate-altitude-button').addEventListener('click', async () => {

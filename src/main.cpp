@@ -5,15 +5,18 @@
 #include <atomic>
 #include <ArduinoJson.h>
 #include "Adafruit_BMP085.h"
+#include "lights.h"
 
 namespace {
     constexpr const char *kApSsid = "Space-Exe-Rocket";
     constexpr const char *kApPassword = "space2200ft";
     constexpr const char *kSensorDataPath = "/data/sensors.csv";
+    constexpr const char *kApogeePath = "/data/apogee.csv";
     constexpr unsigned long kSensorIntervalMs = 100;
     constexpr unsigned long kFlushIntervalMs = 1000;
-    constexpr float kMockPressureHpa = 1001.76f;
+    constexpr float kMockPressureHpa = 1000.00f;
     constexpr int kSensorPrecision = 2;
+    float apogee = 0.0f;
 
     struct SensorReading {
         float pressure;
@@ -32,7 +35,8 @@ namespace {
     Adafruit_BMP085 bmp;
     AsyncWebServer server(80);
     AsyncEventSource events("/events");
-    File sensorData;
+    File sensorFile;
+    File apogeeFile;
 
     const char *recordingStateText() {
         return recording.load() ? "true" : "false";
@@ -48,6 +52,7 @@ namespace {
         doc["altitude"] = reading.altitude;
         doc["temperature1"] = reading.temperature1;
         doc["temperature2"] = reading.temperature2;
+        doc["apogee"] = apogee;
         String json;
         serializeJson(doc, json);
         events.send(json, "sensor", millis());
@@ -90,12 +95,16 @@ namespace {
     }
 
     void closeSensorLog() {
-        if (!sensorData) {
-            return;
+        if (sensorFile) {
+            sensorFile.flush();
+            sensorFile.close();
+            sensorFile = File();
         }
-        sensorData.flush();
-        sensorData.close();
-        sensorData = File();
+        if (apogeeFile) {
+            apogeeFile.flush();
+            apogeeFile.close();
+            apogeeFile = File();
+        }
     }
 
     void ensureSensorDataFileExists() {
@@ -103,10 +112,25 @@ namespace {
             return;
         }
         File file = LittleFS.open(kSensorDataPath, FILE_WRITE, true);
-        file.printf("timestamp,pressure,altitude,temperature1,temperature2\n");
-        if (file) {
-            file.close();
+        if (!file) {
+            Serial.println("Failed to create sensor data file");
+            return;
         }
+        file.printf("timestamp,pressure,altitude,temperature1,temperature2\n");
+        file.close();
+    }
+
+    void ensureApogeeFileExists() {
+        if (LittleFS.exists(kApogeePath)) {
+            return;
+        }
+        File file = LittleFS.open(kApogeePath, FILE_WRITE, true);
+        if (!file) {
+            Serial.println("Failed to create apogee file");
+            return;
+        }
+        file.printf("timestamp,apogee\n");
+        file.close();
     }
 
     void runPendingClearData() {
@@ -118,7 +142,12 @@ namespace {
         if (LittleFS.exists(kSensorDataPath)) {
             LittleFS.remove(kSensorDataPath);
         }
+        if (LittleFS.exists(kApogeePath)) {
+            LittleFS.remove(kApogeePath);
+        }
         ensureSensorDataFileExists();
+        ensureApogeeFileExists();
+        apogee = 0.0f;
     }
 
     void runPendingCalibration() {
@@ -135,7 +164,7 @@ namespace {
     }
 
     void logSensorSample(const unsigned long timestamp, const SensorReading &reading) {
-        sensorData.printf("%lu,%.*f,%.*f,%.*f,%.*f\n",
+        sensorFile.printf("%lu,%.*f,%.*f,%.*f,%.*f\n",
                           timestamp,
                           kSensorPrecision, reading.pressure,
                           kSensorPrecision, reading.altitude,
@@ -143,8 +172,14 @@ namespace {
                           kSensorPrecision, reading.temperature2);
 
         if (timestamp - lastFlush >= kFlushIntervalMs) {
-            sensorData.flush();
-            lastFlush = timestamp;
+            sensorFile.flush();
+        }
+    }
+
+    void logApogee(const unsigned long timestamp) {
+        if (timestamp - lastFlush >= kFlushIntervalMs) {
+            apogeeFile.printf("%lu,%.*f\n", timestamp, kSensorPrecision, apogee);
+            apogeeFile.flush();
         }
     }
 
@@ -171,9 +206,9 @@ namespace {
             request->send(200);
         });
 
-        server.on("/download", HTTP_GET, [](AsyncWebServerRequest *request) {
+        server.on("/download-sensor-data", HTTP_GET, [](AsyncWebServerRequest *request) {
             if (recording.load()) {
-                request->send(409, "text/plain", "Cannot download data while recording");
+                request->send(409, "text/plain", "Cannot download sensor data while recording");
                 return;
             }
 
@@ -183,6 +218,20 @@ namespace {
             }
 
             request->send(LittleFS, kSensorDataPath, "text/csv", true);
+        });
+
+        server.on("/download-apogee", HTTP_GET, [](AsyncWebServerRequest *request) {
+            if (recording.load()) {
+                request->send(409, "text/plain", "Cannot download apogee while recording");
+                return;
+            }
+
+            if (!LittleFS.exists(kApogeePath)) {
+                request->send(404, "text/plain", "File not found");
+                return;
+            }
+
+            request->send(LittleFS, kApogeePath, "text/csv", true);
         });
 
         server.on("/calibrate-altitude", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -198,38 +247,48 @@ namespace {
             calibratePending.store(true);
             request->send(200);
         });
+
+        events.onConnect([](AsyncEventSourceClient *client) {
+            if (client->lastId()) {
+                Serial.printf("Client reconnecting, last event id: %u\n", client->lastId());
+            }
+    
+            client->send(recordingStateText(), "recording", millis(), 10000);
+        });
+
+        server.addHandler(&events);
     }
 } // namespace
 
 void setup() {
     Serial.begin(115200);
-    if (!LittleFS.begin()) {
-        Serial.println("LittleFS mount failed");
-    }
-    ensureSensorDataFileExists();
-    WiFi.softAP(kApSsid, kApPassword);
+    setup_rgb_lights();
+    // This is added since A4 (SDA) and A3 accidentally been shorted together
+    pinMode(A3, INPUT);
     pinMode(A1, INPUT);
 
-    if (!LittleFS.begin()) {
+    if (!LittleFS.begin(true)) {
         Serial.println("LittleFS mount failed");
     }
+
+    ensureSensorDataFileExists();
+    ensureApogeeFileExists();
+
+    // const float readApogee = 1482.00f; // TODO: read from file
+    // Serial.printf("Displaying apogee of %.*fm\n", kSensorPrecision, readApogee);
+    // display_apogee(readApogee, kSensorPrecision);
+
+    WiFiClass::mode(WIFI_AP);
+    WiFi.softAP(kApSsid, kApPassword);
 
     setupServer();
 
-    events.onConnect([](AsyncEventSourceClient *client) {
-        if (client->lastId()) {
-            Serial.printf("Client reconnecting, last event id: %u\n", client->lastId());
-        }
-
-        client->send(recordingStateText(), "recording", millis(), 10000);
-    });
     bmpReady = bmp.begin();
     if (!bmpReady) {
         Serial.println("Barometer init failed");
     } else {
         calibratedPressure.store(bmp.readPressure());
     }
-    server.addHandler(&events);
     server.begin();
 }
 
@@ -239,10 +298,10 @@ void loop() {
     const unsigned long now = millis();
 
     runPendingClearData();
-    if (!recording.load() && sensorData) {
+    runPendingCalibration();
+    if (!recording.load() && (sensorFile || apogeeFile)) {
         closeSensorLog();
     }
-    runPendingCalibration();
 
     if (now - lastSampleMs < kSensorIntervalMs) {
         return;
@@ -250,21 +309,36 @@ void loop() {
     lastSampleMs = now;
 
     const SensorReading reading = readSensors();
+    if (reading.altitude > apogee) {
+        apogee = reading.altitude;
+    }
     sendSensorEvent(reading);
 
     if (recording.load()) {
-        if (!sensorData) {
-            sensorData = LittleFS.open(kSensorDataPath, FILE_APPEND);
-            if (!sensorData) {
+        if (!sensorFile || !apogeeFile) {
+            if (!sensorFile) {
+                Serial.println("Opening sensor file for writing");
+                sensorFile = LittleFS.open(kSensorDataPath, FILE_APPEND);
+            }
+            if (!apogeeFile) {
+                Serial.println("Opening apogee file for writing");
+                apogeeFile = LittleFS.open(kApogeePath, FILE_APPEND);
+            }
+            if (!sensorFile || !apogeeFile) {
                 Serial.println("Failed to open file for writing");
                 recording.store(false);
                 sendRecordingEvent();
             } else {
                 lastFlush = now;
                 logSensorSample(now, reading);
+                logApogee(now);
             }
         } else {
             logSensorSample(now, reading);
+            logApogee(now);
+        }
+        if (now - lastFlush >= kFlushIntervalMs) {
+            lastFlush = now;
         }
     }
 }
