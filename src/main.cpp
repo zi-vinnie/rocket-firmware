@@ -28,6 +28,8 @@ namespace {
     std::atomic<bool> recording{false};
     std::atomic<bool> clearDataPending{false};
     std::atomic<bool> calibratePending{false};
+    std::atomic<bool> disableWifiPending{false};
+    std::atomic<bool> wifiEnabled{true};
     std::atomic<float> calibratedPressure{0.0f};
     bool bmpReady = false;
     unsigned long lastFlush = 0;
@@ -166,6 +168,16 @@ namespace {
         sendCalibrationEvent();
     }
 
+    void runPendingDisableWifi() {
+        if (!disableWifiPending.exchange(false)) {
+            return;
+        }
+        Serial.println("Disabling Wi-Fi");
+        wifiEnabled.store(false);
+        WiFi.softAPdisconnect(true);
+        WiFiClass::mode(WIFI_OFF);
+    }
+
     void logSensorSample(const unsigned long timestamp, const SensorReading &reading) {
         sensorFile.printf("%lu,%.*f,%.*f,%.*f,%.*f\n",
                           timestamp,
@@ -260,6 +272,22 @@ namespace {
             request->send(200);
         });
 
+        server.on("/disable-wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
+            if (!recording.load()) {
+                Serial.println("Rejected disable-wifi: recording not active");
+                request->send(409, "text/plain", "Recording must be active before disabling Wi-Fi");
+                return;
+            }
+            if (!wifiEnabled.load()) {
+                Serial.println("Rejected disable-wifi: Wi-Fi already disabled");
+                request->send(409, "text/plain", "Wi-Fi already disabled");
+                return;
+            }
+
+            disableWifiPending.store(true);
+            request->send(200);
+        });
+
         events.onConnect([](AsyncEventSourceClient *client) {
             if (client->lastId()) {
                 Serial.printf("Client reconnecting, last event id: %u\n", client->lastId());
@@ -280,6 +308,7 @@ void setup() {
     // This is added since A4 (SDA) and A3 accidentally been shorted together
     pinMode(A3, INPUT);
     pinMode(A1, INPUT);
+    pinMode(A2, INPUT);
 
     if (!LittleFS.begin(true)) {
         Serial.println("LittleFS mount failed");
@@ -314,6 +343,7 @@ void loop() {
 
     runPendingClearData();
     runPendingCalibration();
+    runPendingDisableWifi();
     if (!recording.load()) {
         closeSensorLog();
     }
@@ -327,7 +357,9 @@ void loop() {
     if (reading.altitude > apogee) {
         apogee = reading.altitude;
     }
-    sendSensorEvent(reading);
+    if (wifiEnabled.load()) {
+        sendSensorEvent(reading);
+    }
 
     if (recording.load()) {
         if (!sensorFile || !apogeeFile) {

@@ -64,6 +64,7 @@
     </div>
     <div class="card">
         <button class="main-button" id="toggle-recording-button" data-recording="false">Start Recording</button>
+        <button class="main-button" id="disable-wifi-button" disabled>Disable Wi-Fi</button>
         <div style="display: flex; flex-direction: row; gap: 10px; width: 100%;">
             <button class="main-button" id="download-data-button">Download Sensor Data</button>
             <button class="main-button" id="download-apogee-button">Download Apogee Data</button>
@@ -95,6 +96,12 @@
         console.log('Calibration:', data);
     });
 
+    const updateDisableWifiButtonState = () => {
+        const disableWifiButton = document.getElementById('disable-wifi-button');
+        const isRecording = document.getElementById('toggle-recording-button').dataset.recording === 'true';
+        disableWifiButton.disabled = !isRecording;
+    };
+
     source.addEventListener('recording', (e) => {
         const clearDataButton = document.getElementById('clear-data-button');
         const toggleRecordingButton = document.getElementById('toggle-recording-button');
@@ -112,12 +119,37 @@
             toggleRecordingButton.dataset.recording = 'false';
             toggleRecordingButton.textContent = 'Start Recording';
         }
+        updateDisableWifiButtonState();
         console.log('Recording:', e.data);
     });
 
     // Connection lifecycle
     source.onopen = () => console.log('SSE connected');
     source.onerror = () => console.log('SSE error — browser will retry automatically');
+
+    document.getElementById('disable-wifi-button').addEventListener('click', async () => {
+        const btn = document.getElementById('disable-wifi-button');
+
+        const disableWifiConfirmation = confirm(
+            'Disable Wi-Fi? You will lose connection until the rocket is reset after landing.'
+        );
+        if (!disableWifiConfirmation) {
+            return;
+        }
+
+        btn.disabled = true;
+        try {
+            const response = await fetch('/disable-wifi', {method: 'POST'});
+            if (!response.ok) {
+                console.error('Request failed:', response.status);
+                alert('Failed to disable Wi-Fi');
+                updateDisableWifiButtonState();
+            }
+        } catch (err) {
+            console.error('Network error:', err);
+            updateDisableWifiButtonState();
+        }
+    });
 
     document.getElementById('toggle-recording-button').addEventListener('click', async () => {
         const btn = document.getElementById('toggle-recording-button');
