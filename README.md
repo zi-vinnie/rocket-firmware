@@ -14,7 +14,7 @@ The dashboard shows:
 
 - **Air pressure** from the BMP085 barometer (in hPa)
 - **Altitude** derived from barometric pressure (in m), relative to a calibrated sea-level reference
-- **Apogee** — the highest altitude reached since the last clear (in m)
+- **Apogee** — the highest altitude reached since the last clear (in m); restored from `apogee.csv` on boot if a previous session was recorded
 - **Two temperature readings** (in °C) from dedicated temperature sensors — the display is in place, but the sensors have **not been programmed yet**
 
 Tap the calibrated pressure value above the altitude display to **calibrate altitude** — this sets the current barometric reading as the sea-level reference (zero altitude). Calibration is disabled while recording.
@@ -29,26 +29,32 @@ You can start and stop recording from the dashboard. While recording, sensor rea
 
 Files are flushed to flash every second so that if power is lost mid-flight, data written up to that point should remain intact.
 
-You can **download** each CSV separately from the dashboard or **clear** both files to start fresh. Download and clear are disabled while recording.
+You can **download** each CSV separately from the dashboard or **clear** both files to start fresh. Download and clear are disabled while recording. While recording, you can also **disable Wi‑Fi** to save battery and reduce radio interference. Wi‑Fi comes back on the next boot (e.g. after pressing reset).
 
-### RGB lights (partial)
+### RGB apogee indicator
 
-The onboard RGB LED driver is implemented in `lights.cpp` and can flash the apogee value after landing (white pulse to start, then coloured flashes per digit). This is not yet triggered automatically — the call in `setup()` is still commented out pending post-flight integration.
+After a flight, pressing the **reset button** reboots the rocket. If apogee data exists from a previous recording, the onboard RGB LED flashes the peak altitude before Wi‑Fi starts: a white pulse, then each digit as coloured flashes (red, green, and blue cycle per digit). A decimal point is shown as a short white flash.
+
+## How to use
+
+Connect to the rocket's Wi‑Fi network (**Space-Exe-Rocket**, password `space2200ft`) and open **http://192.168.4.1** in a browser.
+
+### Before launch
+
+1. **Clear data** — tap Clear on the dashboard to wipe any old flight files.
+2. **Start recording** — tap Start Recording on the dashboard.
+3. **Turn off Wi‑Fi** — tap Disable Wi‑Fi. You will lose connection; that is expected.
+
+### After landing
+
+1. **Press the reset button** on the Arduino to reboot the rocket.
+2. **Read apogee from the blinking light** — watch the RGB LED for the peak altitude display.
+3. **Connect to Wi‑Fi** from your phone or laptop (the network is back after reset).
+4. **Download data** from the dashboard (`sensors.csv` and `apogee.csv`) for processing.
 
 ## Still to do
 
-**Sensors**
-
 - **Temperature sensors** — read the two dedicated temperature sensors properly
-
-**Before launch**
-
-- **Turn Wi‑Fi off from the dashboard** — disable the network during flight to save battery and reduce radio interference
-
-**After landing**
-
-- **RGB light apogee indicator** — call `display_apogee()` after landing to show peak altitude on the onboard LED
-- **Turn Wi‑Fi back on automatically** — re-enable the network once the rocket has landed
 
 ## Building and flashing
 

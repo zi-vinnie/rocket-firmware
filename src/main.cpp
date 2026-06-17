@@ -81,7 +81,7 @@ namespace {
                 .pressure = kMockPressureHpa,
                 .altitude = 0.0f,
                 .temperature1 = 0.0f,
-                .temperature2 = static_cast<float>(analogRead(A1)) / 100.0f,
+                .temperature2 = 0.0f,
             };
         }
 
@@ -92,7 +92,7 @@ namespace {
             .pressure = pressurePa / 100.0f,
             .altitude = pressureToAltitude(pressurePa, sealevelPressurePa),
             .temperature1 = bmp.readTemperature(),
-            .temperature2 = static_cast<float>(analogRead(A1)) / 100.0f,
+            .temperature2 = 0.0f,
         };
     }
 
@@ -331,8 +331,6 @@ void setup() {
     setup_rgb_lights();
     // This is added since A4 (SDA) and A3 accidentally been shorted together
     pinMode(A3, INPUT);
-    pinMode(A1, INPUT);
-    pinMode(A2, INPUT);
 
     if (!LittleFS.begin(true)) {
         Serial.println("LittleFS mount failed");
