@@ -137,6 +137,30 @@ namespace {
         file.close();
     }
 
+    bool readLastApogeeFromFile(float &out) {
+        File file = LittleFS.open(kApogeePath, FILE_READ);
+        if (!file) {
+            return false;
+        }
+        file.readStringUntil('\n');
+        float lastApogee = 0.0f;
+        bool found = false;
+        while (file.available()) {
+            const String line = file.readStringUntil('\n');
+            unsigned long timestamp;
+            float value;
+            if (sscanf(line.c_str(), "%lu,%f", &timestamp, &value) == 2) {
+                lastApogee = value;
+                found = true;
+            }
+        }
+        file.close();
+        if (found) {
+            out = lastApogee;
+        }
+        return found;
+    }
+
     void runPendingClearData() {
         if (!clearDataPending.exchange(false)) {
             return;
@@ -317,9 +341,15 @@ void setup() {
     ensureSensorDataFileExists();
     ensureApogeeFileExists();
 
-    // const float readApogee = 1482.00f; // TODO: read from file
-    // Serial.printf("Displaying apogee of %.*fm\n", kSensorPrecision, readApogee);
-    // display_apogee(readApogee, kSensorPrecision);
+    float readApogee = 0.0f;
+    if (readLastApogeeFromFile(readApogee)) {
+        apogee = readApogee;
+        Serial.printf("Displaying apogee of %.*fm\n", kSensorPrecision, readApogee);
+        display_apogee(readApogee, kSensorPrecision);
+    } else {
+        Serial.println("No apogee data found, using default");
+        display_apogee(1, 0);
+    }
 
     WiFiClass::mode(WIFI_AP);
     WiFi.softAP(kApSsid, kApPassword);
