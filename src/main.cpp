@@ -21,8 +21,7 @@ namespace {
     struct SensorReading {
         float pressure;
         float altitude;
-        float temperature1;
-        float temperature2;
+        float temperature;
     };
 
     std::atomic<bool> recording{false};
@@ -52,8 +51,7 @@ namespace {
         JsonDocument doc;
         doc["pressure"] = reading.pressure;
         doc["altitude"] = reading.altitude;
-        doc["temperature1"] = reading.temperature1;
-        doc["temperature2"] = reading.temperature2;
+        doc["temperature"] = reading.temperature;
         doc["apogee"] = apogee;
         String json;
         serializeJson(doc, json);
@@ -80,8 +78,7 @@ namespace {
             return {
                 .pressure = kMockPressureHpa,
                 .altitude = 0.0f,
-                .temperature1 = 0.0f,
-                .temperature2 = 0.0f,
+                .temperature = 0.0f,
             };
         }
 
@@ -91,8 +88,7 @@ namespace {
         return {
             .pressure = pressurePa / 100.0f,
             .altitude = pressureToAltitude(pressurePa, sealevelPressurePa),
-            .temperature1 = bmp.readTemperature(),
-            .temperature2 = 0.0f,
+            .temperature = bmp.readTemperature(),
         };
     }
 
@@ -120,7 +116,7 @@ namespace {
             Serial.println("Failed to create sensor data file");
             return;
         }
-        file.printf("timestamp,pressure,altitude,temperature1,temperature2\n");
+        file.printf("timestamp,pressure,altitude,temperature\n");
         file.close();
     }
 
@@ -203,12 +199,11 @@ namespace {
     }
 
     void logSensorSample(const unsigned long timestamp, const SensorReading &reading) {
-        sensorFile.printf("%lu,%.*f,%.*f,%.*f,%.*f\n",
+        sensorFile.printf("%lu,%.*f,%.*f,%.*f\n",
                           timestamp,
                           kSensorPrecision, reading.pressure,
                           kSensorPrecision, reading.altitude,
-                          kSensorPrecision, reading.temperature1,
-                          kSensorPrecision, reading.temperature2);
+                          kSensorPrecision, reading.temperature);
 
         if (timestamp - lastFlush >= kFlushIntervalMs) {
             sensorFile.flush();

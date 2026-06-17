@@ -15,7 +15,7 @@ The dashboard shows:
 - **Air pressure** from the BMP085 barometer (in hPa)
 - **Altitude** derived from barometric pressure (in m), relative to a calibrated sea-level reference
 - **Apogee** — the highest altitude reached since the last clear (in m); restored from `apogee.csv` on boot if a previous session was recorded
-- **Two temperature readings** (in °C) from dedicated temperature sensors — the display is in place, but the sensors have **not been programmed yet**
+- **Temperature** (in °C) from the BMP085 barometer
 
 Tap the calibrated pressure value above the altitude display to **calibrate altitude** — this sets the current barometric reading as the sea-level reference (zero altitude). Calibration is disabled while recording.
 
@@ -23,7 +23,7 @@ Tap the calibrated pressure value above the altitude display to **calibrate alti
 
 You can start and stop recording from the dashboard. While recording, sensor readings are sampled every **100 ms** and appended to CSV files on flash.
 
-**Sensor data** (`/data/sensors.csv`) has columns `timestamp`, `pressure`, `altitude`, `temperature1`, and `temperature2`. Each row includes the millisecond timestamp from boot and the current sensor values (2 decimal places).
+**Sensor data** (`/data/sensors.csv`) has columns `timestamp`, `pressure`, `altitude`, and `temperature`. Each row includes the millisecond timestamp from boot and the current sensor values (2 decimal places).
 
 **Apogee data** (`/data/apogee.csv`) has columns `timestamp` and `apogee`, logging the peak altitude reached so far during the recording session.
 

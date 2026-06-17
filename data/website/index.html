@@ -11,55 +11,41 @@
     <img src="favicon.ico" alt="Space Exe Rocket">
 </div>
 <div id="content">
-    <div id="card-1-container">
-        <div class="card">
-            <h3>Apogee</h3>
-            <hr class="card-divider">
-            <div class="value-container">
-                <p id="apogee-value" class="value">0.0</p>
-                <p id="apogee-unit" class="unit">m</p>
-            </div>
+    <div class="card">
+        <h3>Apogee</h3>
+        <hr class="card-divider">
+        <div class="value-container">
+            <p id="apogee-value" class="value">0.0</p>
+            <p id="apogee-unit" class="unit">m</p>
         </div>
-        <div class="card">
-            <h3>Barometer</h3>
-            <hr class="card-divider">
-            <div class="value-container">
-                <p id="barometer-value" class="value">1001.76</p>
-                <p id="barometer-unit" class="unit">hPa</p>
-            </div>
-            <div class="section-header">
-                <div></div>
-                <h3>Altitude</h3>
-                <button class="hidden-button" id="calibrate-altitude-button">
-                    <div class="hidden-button-value-container">
-                        <p style="line-height: 1.09;" id="calibrated-altitude-value">1001.76</p>
-                        <p class="hidden-button-unit">hPa</p>
-                    </div>
-                </button>
-            </div>
-            <hr class="card-divider">
-            <div class="value-container">
-                <p id="altitude-value" class="value">0.0</p>
-                <p id="altitude-unit" class="unit">m</p>
-            </div>
+    </div>
+    <div class="card">
+        <h3>Barometer</h3>
+        <hr class="card-divider">
+        <div class="value-container">
+            <p id="barometer-value" class="value">0.00</p>
+            <p id="barometer-unit" class="unit">hPa</p>
         </div>
-        <div id="card-2-container">
-            <div class="card">
-                <h3>Temperature 1</h3>
-                <hr class="card-divider">
-                <div class="value-container">
-                    <p id="temp-1-value" class="value">21.8</p>
-                    <p id="temp-1-unit" class="unit">°C</p>
+        <div class="section-header">
+            <div></div>
+            <h3>Altitude</h3>
+            <button class="hidden-button" id="calibrate-altitude-button">
+                <div class="hidden-button-value-container">
+                    <p style="line-height: 1.09;" id="calibrated-altitude-value">0.00</p>
+                    <p class="hidden-button-unit">hPa</p>
                 </div>
-            </div>
-            <div class="card">
-                <h3>Temperature 2</h3>
-                <hr class="card-divider">
-                <div class="value-container">
-                    <p id="temp-2-value" class="value">21.9</p>
-                    <p id="temp-2-unit" class="unit">°C</p>
-                </div>
-            </div>
+            </button>
+        </div>
+        <hr class="card-divider">
+        <div class="value-container">
+            <p id="altitude-value" class="value">0.00</p>
+            <p id="altitude-unit" class="unit">m</p>
+        </div>
+        <h3>Temperature</h3>
+        <hr class="card-divider">
+        <div class="value-container">
+            <p id="temp-value" class="value">0.0</p>
+            <p id="temp-unit" class="unit">°C</p>
         </div>
     </div>
     <div class="card">
@@ -80,12 +66,11 @@
     const formatSensorValue = (value) => Number(value ?? 0).toFixed(sensorPrecision);
 
     source.addEventListener('sensor', (e) => {
-    
+
         const data = JSON.parse(e.data);
         document.getElementById('barometer-value').textContent = formatSensorValue(data.pressure);
         document.getElementById('altitude-value').textContent = formatSensorValue(data.altitude);
-        document.getElementById('temp-1-value').textContent = formatSensorValue(data.temperature1);
-        document.getElementById('temp-2-value').textContent = formatSensorValue(data.temperature2);
+        document.getElementById('temp-value').textContent = formatSensorValue(data.temperature);
         document.getElementById('apogee-value').textContent = formatSensorValue(data.apogee);
         console.log('Sensor data:', data);
     });
